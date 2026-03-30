@@ -110,7 +110,7 @@ class Lexer:
             return None
         return self.fonte[self.indice]
 
-    def espiar(self, deslocamento: int = 1) -> str | None:
+    def ver_proximo(self, deslocamento: int = 1) -> str | None:
         posicao = self.indice + deslocamento
         if posicao >= self.tamanho:
             return None
@@ -140,12 +140,12 @@ class Lexer:
                 self.avancar()
                 continue
 
-            if caractere == "/" and self.espiar() == "/":
+            if caractere == "/" and self.ver_proximo() == "/":
                 while self.caractere_atual() not in {None, "\n"}:
                     self.avancar()
                 continue
 
-            if caractere == "/" and self.espiar() == "*":
+            if caractere == "/" and self.ver_proximo() == "*":
                 linha_inicial = self.linha
                 coluna_inicial = self.coluna
                 self.avancar()
@@ -165,7 +165,7 @@ class Lexer:
                             )
                         )
                         return
-                    if atual == "*" and self.espiar() == "/":
+                    if atual == "*" and self.ver_proximo() == "/":
                         self.avancar()
                         self.avancar()
                         break
@@ -204,7 +204,7 @@ class Lexer:
                 lexema.append(self.avancar())
                 continue
 
-            if caractere == "." and not tem_ponto and (self.espiar() or "").isdigit():
+            if caractere == "." and not tem_ponto and (self.ver_proximo() or "").isdigit():
                 tem_ponto = True
                 lexema.append(self.avancar())
                 continue
@@ -318,7 +318,7 @@ class Lexer:
         linha_inicial = self.linha
         coluna_inicial = self.coluna
 
-        par = (caractere or "") + (self.espiar() or "")
+        par = (caractere or "") + (self.ver_proximo() or "")
         if par in DOUBLE_OPERATORS:
             self.avancar()
             self.avancar()
