@@ -3,10 +3,10 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-
+//importar o analisador lexico para obter os tokens
 from analisador_lexico import Token, analisar_arquivo
 
-
+//conjunto de tipos para o parser
 TIPOS_PRIMITIVOS = {"int", "float", "char", "string", "bool", "void"}
 OPERADORES_ATRIBUICAO = {"=", "+=", "-=", "*=", "/=", "%="}
 OPERADORES_OU = {"||", "or"}
@@ -18,7 +18,7 @@ OPERADORES_FATOR = {"*", "/", "%"}
 OPERADORES_UNARIOS = {"!", "-", "+", "not", "++", "--"}
 LITERAIS_BOOLEANOS = {"true", "false"}
 
-
+//erro sintatico, informando linha e coluna para localizar
 @dataclass
 class ErroSintatico(Exception):
     mensagem: str
@@ -28,30 +28,32 @@ class ErroSintatico(Exception):
     def __str__(self) -> str:
         return f"Erro sintatico na linha {self.linha}, coluna {self.coluna}: {self.mensagem}"
 
-
+//no da arvore sintatica
 @dataclass
 class NoArvore:
     nome: str
-    filhos: list["NoArvore"] = field(default_factory=list)
+    filhos: list["NoArvore"] = field(default_factory=list) //cada no comeca sem filhos
 
     def adicionar(self, *novos_filhos: "NoArvore | None") -> "NoArvore":
         for filho in novos_filhos:
             if filho is not None:
                 self.filhos.append(filho)
         return self
-
+    //converte a arvore para texto
     def para_texto(self, nivel: int = 0) -> str:
         linhas = [f"{'  ' * nivel}{self.nome}"]
         for filho in self.filhos:
-            linhas.append(filho.para_texto(nivel + 1))
+            linhas.append(filho.para_texto(nivel + 1)) //recursao
         return "\n".join(linhas)
 
-
+//transforma token em no da arvore
 def no_token(token: Token) -> NoArvore:
     return NoArvore(f"{token.tipo}({token.lexema})")
 
-
+//controla leitura, valida regra, constroi a arvore
 class Parser:
+
+    //inicializa a lista de tokens produzida pelo lexico
     def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
         self.indice = 0
@@ -61,18 +63,21 @@ class Parser:
             return None
         return self.tokens[self.indice]
 
+    //olha o prox token sem consumir
     def ver_proximo(self, deslocamento: int = 1) -> Token | None:
         posicao = self.indice + deslocamento
         if posicao >= len(self.tokens):
             return None
         return self.tokens[posicao]
 
+    //consome o token atual e avanca
     def avancar(self) -> Token | None:
         token = self.token_atual()
         if token is not None:
             self.indice += 1
         return token
 
+    //verifica se o token atual combina com o tipo e lexema esperados, sem avancar, remover ou gerar erro
     def token_eh(self, *, tipo: str | None = None, lexema: str | None = None) -> bool:
         token = self.token_atual()
         if token is None:
@@ -83,20 +88,24 @@ class Parser:
             return False
         return True
 
+    //verifica se o token atual é o esperado, se sim avanca, se nao gera erro
     def consumir(self, *, tipo: str | None = None, lexema: str | None = None, esperado: str) -> Token:
         token = self.token_atual()
+        //arquivo terminou antes de encontrar o token esperado 
         if token is None:
             raise ErroSintatico(
                 f"era esperado {esperado}, mas o arquivo terminou",
                 self.linha_final(),
                 self.coluna_final(),
             )
+        //tipo encontrado, mas nao combina com o esperado
         if tipo is not None and token.tipo != tipo:
             raise ErroSintatico(
                 f"era esperado {esperado}, mas foi encontrado {token.lexema!r}",
                 token.linha,
                 token.coluna,
             )
+        //lexema encontrado, mas nao combina com o esperado
         if lexema is not None and token.lexema != lexema:
             raise ErroSintatico(
                 f"era esperado {esperado}, mas foi encontrado {token.lexema!r}",
@@ -105,10 +114,11 @@ class Parser:
             )
         self.indice += 1
         return token
-
+    //consome o token esperado e o transforma em no da arvore
     def consumir_no(self, *, tipo: str | None = None, lexema: str | None = None, esperado: str) -> NoArvore:
         return no_token(self.consumir(tipo=tipo, lexema=lexema, esperado=esperado))
 
+    //linha e coluna do ultimo token para gerar mensagens de erro caso o arquivo termine antes
     def linha_final(self) -> int:
         if not self.tokens:
             return 1
@@ -120,6 +130,7 @@ class Parser:
         ultimo = self.tokens[-1]
         return ultimo.coluna + len(ultimo.lexema)
 
+    //verifica se os tokens do lexico sao validos, inicia a analise sintatica e confirma se foram consumidos
     def analisar(self) -> NoArvore:
         self.validar_tokens_lexicos()
         arvore = self.programa()
@@ -140,7 +151,7 @@ class Parser:
                     token.linha,
                     token.coluna,
                 )
-
+    //cria a raiz da arvore e inicia            
     def programa(self) -> NoArvore:
         raiz = NoArvore("programa")
         while self.token_atual() is not None:
@@ -399,11 +410,11 @@ class Parser:
             )
         return no
 
-
+//salvar a arvore sintatica em um arquivo de texto
 def salvar_arvore(arvore: NoArvore, caminho_saida: Path) -> None:
     caminho_saida.write_text(arvore.para_texto() + "\n", encoding="utf-8")
 
-
+//analizar o arquivo de entrada
 def analisar_sintaxe(caminho_arquivo: Path) -> NoArvore:
     tokens = analisar_arquivo(caminho_arquivo)
     parser = Parser(tokens)
