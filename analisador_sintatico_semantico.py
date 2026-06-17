@@ -18,11 +18,8 @@ OPERADORES_FATOR = {"*", "/", "%"}
 OPERADORES_UNARIOS = {"!", "-", "+", "not", "++", "--"}
 LITERAIS_BOOLEANOS = {"true", "false"}
 
-
-# --- INFRAESTRUTURA DE EXCEÇÕES E ERROS ---
-
 class ErroCompilacao(Exception):
-    """Classe base para todos os erros do compilador."""
+    # Classe base para todos os erros do compilador
     def __init__(self, mensagem: str, linha: int, coluna: int) -> None:
         self.mensagem = mensagem
         self.linha = linha
@@ -47,14 +44,12 @@ class ResultadoAnalise:
     erros: list[ErroCompilacao]
     tabela_global: "TabelaSimbolos"
 
-
-# --- INFRAESTRUTURA DA ÁRVORE SINTÁTICA ANOTADA ---
-
+# Arvore sintática
 @dataclass
 class NoArvore:
     nome: str
     filhos: list["NoArvore"] = field(default_factory=list)  # Cada nó começa sem filhos
-    tipo_semantico: str | None = None  # Tipo inferido para o nó (ex: 'int', 'bool')
+    tipo_semantico: str | None = None 
 
     def adicionar(self, *novos_filhos: "NoArvore | None") -> "NoArvore":
         for filho in novos_filhos:
@@ -62,22 +57,19 @@ class NoArvore:
                 self.filhos.append(child)
         return self
 
-    # Converte a árvore para texto exibindo as anotações semânticas de tipo
+    # Converte a árvore para texto
     def para_texto(self, nivel: int = 0) -> str:
         tipo_str = f" [{self.tipo_semantico}]" if self.tipo_semantico else ""
         linhas = [f"{'  ' * nivel}{self.nome}{tipo_str}"]
         for filho in self.filhos:
-            linhas.append(filho.para_texto(nivel + 1))  # Recursão
+            linhas.append(filho.para_texto(nivel + 1))
         return "\n".join(linhas)
 
-
-# Transforma token em nó da árvore
+# Transforma token em nó
 def no_token(token: Token) -> NoArvore:
     return NoArvore(f"{token.tipo}({token.lexema})")
 
-
-# --- TABELA DE SÍMBOLOS E GERENCIAMENTO DE ESCOPO ---
-
+# Tabela de símbolos
 class TabelaSimbolos:
     def __init__(self, pai: TabelaSimbolos | None = None, nome_escopo: str = "global") -> None:
         self.tabela: dict[str, dict] = {}
@@ -109,7 +101,6 @@ class TabelaSimbolos:
             filho._coletar_simbolos(acumulador)
 
     def imprimir_tabela(self) -> None:
-        """Imprime TODOS os símbolos de forma centralizada em uma única listagem unificada."""
         simbolos = []
         self._coletar_simbolos(simbolos)
 
@@ -128,9 +119,7 @@ class TabelaSimbolos:
                 params = str(info["params"]) if "params" in info else "-"
                 print(f"{nome:<20} | {categoria:<12} | {tipo:<13} | {params:<15} | {escopo:<20}")
 
-
-# --- PARSER COM ANÁLISE SEMÂNTICA INTEGRADA ---
-
+# Parser Sintático e Semântico
 class ParserSemantico:
     def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
@@ -169,7 +158,7 @@ class ParserSemantico:
         return True
 
     def verificar_token_invalido(self) -> None:
-        """Lança erro léxico imediatamente se o token atual for inválido."""
+        # Erro léxico 
         token = self.token_atual()
         if token is not None and not token.valido:
             raise ErroLexico(f"Token inválido detectado: {token.mensagem}", token.linha, token.coluna)
@@ -217,7 +206,6 @@ class ParserSemantico:
             self.avancar()
 
     def analisar(self) -> ResultadoAnalise:
-        # Carrega preliminarmente os erros vindos do arquivo léxico
         for token in self.tokens:
             if not token.valido:
                 self.registrar_erro(ErroLexico(token.mensagem, token.linha, token.coluna))
@@ -280,7 +268,6 @@ class ParserSemantico:
 
         self.consumir(lexema="(", esperado="'('")
         
-        # Escopo da função ativo para receber parâmetros
         novo_escopo = TabelaSimbolos(pai=self.escopo_atual, nome_escopo=f"funcao {nome_funcao}")
         self.escopo_atual.filhos_escopos.append(novo_escopo)
         self.escopo_atual = novo_escopo
@@ -295,10 +282,8 @@ class ParserSemantico:
             
         self.consumir(lexema=")", esperado="')'")
 
-        # Registra a assinatura da função no escopo pai (global)
         self.escopo_atual.pai.inserir_funcao(nome_funcao, tipo_retorno, lista_params, token_id.linha, token_id.coluna)
 
-        # Processa o bloco interno reaproveitando o escopo criado
         no_bloco = self.bloco(criar_escopo=False)
         
         self.escopo_atual = self.escopo_atual.pai
@@ -345,7 +330,6 @@ class ParserSemantico:
             self.consumir(lexema="=", esperado="'='")
             no_exp = self.expressao()
             
-            # Validação Semântica de Atribuição na inicialização
             if no_exp.tipo_semantico and no_exp.tipo_semantico != tipo_str:
                 if not (tipo_str == "float" and no_exp.tipo_semantico == "int"):
                     self.registrar_erro(ErroSemantico(f"Tipo incompatível: não é possível atribuir {no_exp.tipo_semantico} a {tipo_str}.", token_id.linha, token_id.coluna))
@@ -407,7 +391,6 @@ class ParserSemantico:
         self.consumir(lexema="(", esperado="'('")
         no_cond = self.expressao()
         
-        # Validação Semântica: Condição IF precisa ser booleana
         if no_cond.tipo_semantico and no_cond.tipo_semantico != "bool":
             self.registrar_erro(ErroSemantico("A condição do 'if' deve ser uma expressão booleana.", self.linha_final(), self.coluna_final()))
             
@@ -425,7 +408,6 @@ class ParserSemantico:
         self.consumir(lexema="(", esperado="'('")
         no_cond = self.expressao()
         
-        # Validação Semântica: Condição WHILE precisa ser booleana
         if no_cond.tipo_semantico and no_cond.tipo_semantico != "bool":
             self.registrar_erro(ErroSemantico("A condição do 'while' deve ser uma expressão booleana.", self.linha_final(), self.coluna_final()))
             
@@ -443,7 +425,6 @@ class ParserSemantico:
             tipo_exp = no_exp.tipo_semantico or "void"
             no.adicionar(no_exp)
             
-        # Validação Semântica: Tipo do retorno com o tipo da função
         if self.funcao_atual_retorno and self.funcao_atual_retorno != tipo_exp:
             self.registrar_erro(ErroSemantico(f"Retorno inválido. A função exige retorno do tipo {self.funcao_atual_retorno}, mas foi retornado {tipo_exp}.", token_ret.linha, token_ret.coluna))
             
@@ -465,7 +446,6 @@ class ParserSemantico:
             token_op = self.avancar()
             direita = self.atribuicao()
             
-            # Validação Semântica de Atribuições simples ou compostas
             if esquerda.tipo_semantico and direita.tipo_semantico:
                 if esquerda.tipo_semantico != direita.tipo_semantico:
                     if not (esquerda.tipo_semantico == "float" and direita.tipo_semantico == "int"):
@@ -512,7 +492,7 @@ class ParserSemantico:
             token_op = self.avancar()
             proximo = self.fator()
             
-            # Coerção implícita: int + float -> float
+            # Promoção de tipos
             tipo_res = "int"
             if no.tipo_semantico == "float" or proximo.tipo_semantico == "float":
                 tipo_res = "float"
@@ -553,7 +533,6 @@ class ParserSemantico:
             self.consumir(lexema=")", esperado="')'")
             return NoArvore("agrupamento", tipo_semantico=no_exp.tipo_semantico).adicionar(no_exp)
 
-        # Resolução de tipos literais
         if token.tipo == "NUMERO_INTEIRO":
             return NoArvore("literal", tipo_semantico="int").adicionar(no_token(self.avancar()))
         if token.tipo == "NUMERO_REAL":
@@ -571,7 +550,6 @@ class ParserSemantico:
             token_id = self.avancar()
             no_id = no_token(token_id)
             
-            # Verificação de Chamada de Função
             if self.token_eh(lexema="("):
                 self.consumir(lexema="(", esperado="'('")
                 
@@ -588,7 +566,6 @@ class ParserSemantico:
                     
                 self.consumir(lexema=")", esperado="')'")
                 
-                # Validação Semântica de Argumentos vs Parâmetros (quantidade e tipo)
                 if len(lista_args_tipos) != len(info_funcao["params"]):
                     self.registrar_erro(ErroSemantico(f"A função {nome_id!r} esperava {len(info_funcao['params'])} argumentos, mas recebeu {len(lista_args_tipos)}.", token_id.linha, token_id.coluna))
                 else:
@@ -599,7 +576,6 @@ class ParserSemantico:
 
                 return NoArvore("chamada_funcao", tipo_semantico=info_funcao["tipo"]).adicionar(no_id, no_args)
             
-            # Verificação Semântica de uso de Variáveis
             else:
                 info_var = self.escopo_atual.buscar(nome_id)
                 if not info_var:
@@ -626,9 +602,6 @@ class ParserSemantico:
             no.adicionar(prox_exp)
         return no
 
-
-# --- MÉTODOS DE EXECUÇÃO PRINCIPAL ---
-
 def salvar_arvore(arvore: NoArvore, caminho_saida: Path) -> None:
     caminho_saida.write_text(arvore.para_texto() + "\n", encoding="utf-8")
 
@@ -636,7 +609,6 @@ def analisar_semantica(caminho_arquivo: Path) -> ResultadoAnalise:
     tokens = analisar_arquivo(caminho_arquivo)
     parser = ParserSemantico(tokens)
     return parser.analisar()
-
 
 def main() -> int:
     caminho_entrada = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("entrada.txt")
@@ -656,7 +628,7 @@ def main() -> int:
         print(str(erro))
         return 1
 
-    # --- IMPRESSÃO DA TABELA DE SÍMBOLOS NO TERMINAL ---
+    #Imprime a tabela de símbolos
     resultado.tabela_global.imprimir_tabela()
     print("\n" + "="*95)
 
